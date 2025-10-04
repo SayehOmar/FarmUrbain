@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UrbanFarmSaaS — App</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style> #map { height: 70vh; } .panel { max-height:70vh; overflow:auto; } </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <nav class="bg-white shadow p-4 flex items-center justify-between">
+    <div class="flex items-center space-x-4">
+      <a href="/" class="font-bold text-lg text-green-700">🌿 UrbanFarmSaaS</a>
+      <span class="text-sm text-gray-500">Dashboard</span>
+    </div>
+    <div class="flex items-center space-x-3">
+      <button id="refreshBtn" class="px-3 py-2 bg-green-700 text-white rounded">Refresh Data</button>
+      <a href="/" class="text-sm text-gray-600 hover:text-gray-900">Back to Landing</a>
+    </div>
+  </nav>
+
+  <main class="p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
+    <!-- Left control panel -->
+    <section class="md:col-span-1 bg-white rounded-lg shadow p-4 panel">
+      <h3 class="font-semibold text-lg mb-2">Site Selection (AHP)</h3>
+
+      <label class="block text-sm text-gray-600 mt-3">Weight - Vegetation (NDVI): <span id="wNDVIVal">0.4</span></label>
+      <input id="wNDVI" type="range" min="0" max="1" step="0.01" value="0.4" class="w-full" />
+
+      <label class="block text-sm text-gray-600 mt-3">Weight - Impervious (NDBI): <span id="wNDBIVal">0.3</span></label>
+      <input id="wNDBI" type="range" min="0" max="1" step="0.01" value="0.3" class="w-full" />
+
+      <label class="block text-sm text-gray-600 mt-3">Weight - Temperature (LST): <span id="wLSTVal">0.3</span></label>
+      <input id="wLST" type="range" min="0" max="1" step="0.01" value="0.3" class="w-full" />
+
+      <button id="runAHP" class="mt-4 w-full px-3 py-2 rounded bg-green-600 text-white">Run Suitability</button>
+
+      <hr class="my-4" />
+
+      <h4 class="font-medium">Quick Actions</h4>
+      <ul class="text-sm text-gray-600 mt-2 space-y-2">
+        <li><button id="showHeat" class="text-left w-full px-2 py-2 rounded hover:bg-gray-100">Toggle Heatmap</button></li>
+        <li><button id="showCandidates" class="text-left w-full px-2 py-2 rounded hover:bg-gray-100">Show Candidate Sites</button></li>
+      </ul>
+
+      <hr class="my-4" />
+
+      <div>
+        <h5 class="font-semibold">IoT Snapshot</h5>
+        <div id="iotList" class="mt-2 text-sm text-gray-700">
+          Loading sensors...
+        </div>
+      </div>
+    </section>
+
+    <!-- Map -->
+    <section class="md:col-span-3 bg-white rounded-lg shadow p-0">
+      <div id="map"></div>
+      <div class="p-4 border-t flex items-center justify-between">
+        <div>
+          <strong id="selectedInfo">Select a site to view details</strong>
+          <div id="selectedScore" class="text-sm text-gray-600"></div>
+        </div>
+        <div class="flex items-center space-x-3">
+          <button id="downloadReport" class="px-3 py-2 bg-green-700 text-white rounded">Export Report</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right summary panel for candidates -->
+    <aside class="md:col-span-1 bg-white rounded-lg shadow p-4 panel">
+      <h3 class="font-semibold text-lg">Top Candidate Sites</h3>
+      <ul id="candidatesList" class="mt-3 space-y-3 text-sm text-gray-700">
+        <!-- Filled dynamically -->
+      </ul>
+
+      <hr class="my-4" />
+      <h4 class="font-medium">Simulation Controls</h4>
+      <div class="text-sm text-gray-600 mt-2">
+        <label class="block">Cooling Effect (°C): <input id="coolEffect" type="number" value="2" min="0" max="10" class="w-20 ml-2 border rounded px-2 py-1" /></label>
+        <button id="simulate" class="mt-3 px-3 py-2 bg-blue-600 text-white rounded">Simulate Impact</button>
+      </div>
+
+      <div id="simResult" class="mt-4 text-sm text-gray-700"></div>
+    </aside>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    // --- Sample candidate sites (lon, lat) with synthetic NDVI, NDBI, LST values
+    const candidates = [
+      { id: 'C1', name: 'Tunis Centre Roof A', coords: [36.8008, 10.1859], NDVI: 0.12, NDBI: 0.65, LST: 28 },
+      { id: 'C2', name: 'Ariana Lot B', coords: [36.8625, 10.1956], NDVI: 0.18, NDBI: 0.58, LST: 26 },
+      { id: 'C3', name: 'Industrial Zone C', coords: [36.7721, 10.1510], NDVI: 0.05, NDBI: 0.75, LST: 30 },
+      { id: 'C4', name: 'Suburb Far A', coords: [36.9100, 10.0870], NDVI: 0.35, NDBI: 0.30, LST: 22 },
+      { id: 'C5', name: 'Rooftop Mall D', coords: [36.8035, 10.2064], NDVI: 0.08, NDBI: 0.70, LST: 29 }
+    ];
+
+    // Initialize map
+    const map = L.map('map').setView([36.8065, 10.1815], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+
+    // Markers and heat data
+    const markers = [];
+    const heatPoints = candidates.map(c => [c.coords[0], c.coords[1], (c.LST-20)/10]); // intensity from LST
+    let heatLayer = L.heatLayer(heatPoints, {radius: 25, blur:15});
+
+    const candidateGroup = L.layerGroup().addTo(map);
+    candidates.forEach(c => {
+      const m = L.circleMarker(c.coords, {radius:8, color:'#16a34a', fillColor:'#a7f3d0', fillOpacity:0.9})
+        .bindPopup(`<strong>${c.name}</strong><br>NDVI:${c.NDVI}<br>NDBI:${c.NDBI}<br>LST:${c.LST} °C`)
+        .on('click', ()=> selectSite(c));
+      m.addTo(candidateGroup);
+      markers.push({id:c.id, marker:m, data:c});
+    });
+
+    // initial UI population
+    const candidatesList = document.getElementById('candidatesList');
+    const iotList = document.getElementById('iotList');
+
+    function renderCandidates(sorted){
+      candidatesList.innerHTML = '';
+      sorted.forEach((c, idx) => {
+        const li = document.createElement('li');
+        li.className = 'p-2 border rounded';
+        li.innerHTML = `<div class=\"flex justify-between items-center\"><div><strong>${idx+1}. ${c.name}</strong><div class=\"text-xs text-gray-500\">Score: ${c.score.toFixed(2)}</div></div><button data-id=\"${c.id}\" class=\"ml-2 text-sm px-2 py-1 bg-green-600 text-white rounded\">Zoom</button></div>`;
+        candidatesList.appendChild(li);
+      });
+      // attach zoom handlers
+      candidatesList.querySelectorAll('button').forEach(b=> b.addEventListener('click', e=>{
+        const id = e.target.dataset.id;
+        const found = markers.find(m=>m.id===id);
+        if(found){ map.setView(found.marker.getLatLng(),16); found.marker.openPopup(); }
+      }));
+    }
+
+    // default sort by simple suitability using default weights
+    function computeSuitability(weights){
+      // higher NDVI better, higher NDBI worse, higher LST worse
+      return candidates.map(c => {
+        const ndviScore = 1 - c.NDVI; // we want higher vegetation so invert? Wait: actually higher NDVI better => ndviScore = c.NDVI
+        // let's define normalized components between 0 and 1
+        const ndviNorm = c.NDVI; // 0..0.4 typical
+        const ndbiNorm = c.NDBI; // 0..1
+        const lstNorm = Math.min(Math.max((c.LST-20)/15, 0),1); // scale LST
+        const score = weights.NDVI*ndviNorm + weights.NDBI*(1-ndbiNorm) + weights.LST*(1-lstNorm);
+        return {...c, score};
+      }).sort((a,b)=> b.score - a.score);
+    }
+
+    // default run
+    let currentSorted = computeSuitability({NDVI:0.4, NDBI:0.3, LST:0.3});
+    renderCandidates(currentSorted);
+
+    // UI interaction
+    document.getElementById('wNDVI').addEventListener('input', e=>{ document.getElementById('wNDVIVal').innerText = e.target.value; });
+    document.getElementById('wNDBI').addEventListener('input', e=>{ document.getElementById('wNDBIVal').innerText = e.target.value; });
+    document.getElementById('wLST').addEventListener('input', e=>{ document.getElementById('wLSTVal').innerText = e.target.value; });
+
+    document.getElementById('runAHP').addEventListener('click', ()=>{
+      const wNDVI = parseFloat(document.getElementById('wNDVI').value);
+      const wNDBI = parseFloat(document.getElementById('wNDBI').value);
+      const wLST = parseFloat(document.getElementById('wLST').value);
+      // normalize weights
+      const total = wNDVI + wNDBI + wLST || 1;
+      const weights = {NDVI: wNDVI/total, NDBI: wNDBI/total, LST: wLST/total};
+      currentSorted = computeSuitability(weights);
+      renderCandidates(currentSorted);
+      // highlight top candidate on map
+      const top = currentSorted[0];
+      const found = markers.find(m=>m.id===top.id);
+      if(found){ map.setView(found.marker.getLatLng(),15); found.marker.openPopup(); }
+
+      // update right panel list and info
+      document.getElementById('selectedInfo').innerText = `Top site: ${top.name}`;
+      document.getElementById('selectedScore').innerText = `Suitability score: ${top.score.toFixed(2)}`;
+    });
+
+    // selection function
+    function selectSite(c){
+      document.getElementById('selectedInfo').innerText = `${c.name}`;
+      document.getElementById('selectedScore').innerText = `NDVI:${c.NDVI} NDBI:${c.NDBI} LST:${c.LST}°C`;
+    }
+
+    // toggle heatmap
+    let heatVisible = false;
+    document.getElementById('showHeat').addEventListener('click', ()=>{
+      heatVisible = !heatVisible;
+      if(heatVisible) heatLayer.addTo(map); else map.removeLayer(heatLayer);
+    });
+
+    // toggle candidates
+    let candVisible = true;
+    document.getElementById('showCandidates').addEventListener('click', ()=>{
+      candVisible = !candVisible;
+      if(candVisible) candidateGroup.addTo(map); else map.removeLayer(candidateGroup);
+    });
+
+    // fake IoT sensors
+    const sensors = [
+      {id:'S1', loc:[36.8065,10.1815], temp:28, hum:35},
+      {id:'S2', loc:[36.8600,10.1900], temp:26, hum:43},
+      {id:'S3', loc:[36.7800,10.1500], temp:30, hum:30}
+    ];
+
+    function renderIoT(){
+      iotList.innerHTML = '';
+      sensors.forEach(s=>{
+        const d = document.createElement('div');
+        d.className='p-2 border rounded mb-2';
+        d.innerHTML = `<strong>${s.id}</strong> — Temp: ${s.temp}°C — Hum: ${s.hum}%`;
+        iotList.appendChild(d);
+      });
+    }
+    renderIoT();
+
+    // refresh btn randomizes sensor data
+    document.getElementById('refreshBtn').addEventListener('click', ()=>{
+      sensors.forEach(s=>{ s.temp = Math.round( (24 + Math.random()*8)); s.hum = Math.round(30 + Math.random()*40); });
+      renderIoT();
+      alert('Sensor data refreshed (simulated)');
+    });
+
+    // export report
+    document.getElementById('downloadReport').addEventListener('click', ()=>{
+      const top = currentSorted[0];
+      const report = `Site Report\nName: ${top.name}\nScore: ${top.score.toFixed(2)}\nNDVI:${top.NDVI}\nNDBI:${top.NDBI}\nLST:${top.LST}°C`;
+      const blob = new Blob([report], {type:'text/plain'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `${top.id}_report.txt`; a.click(); URL.revokeObjectURL(url);
+    });
+
+    // simulate impact
+    document.getElementById('simulate').addEventListener('click', ()=>{
+      const cooling = parseFloat(document.getElementById('coolEffect').value) || 0;
+      const top = currentSorted[0];
+      const newLST = Math.max(0, top.LST - cooling);
+      document.getElementById('simResult').innerText = `If implemented at ${top.name}, estimated LST drop: ${cooling}°C (from ${top.LST}°C to ${newLST}°C)`;
+    });
+
+    // initial heatmap toggle on
+    heatLayer.addTo(map);
+
+    // show candidates in right list with initial scores
+    // compute using initial weights
+    function initialPopulate(){
+      const weights = {NDVI:0.4, NDBI:0.3, LST:0.3};
+      currentSorted = computeSuitability(weights);
+      renderCandidates(currentSorted);
+    }
+    initialPopulate();
+
+  </script>
+</body>
+</html>
