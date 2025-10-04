@@ -4,11 +4,18 @@ import React from 'react';
 interface SelectionPageProps {
   navigateToUrbanFarm: () => void;
   navigateToLandowner: () => void;
+  goBack: () => void;
 }
 
-const SelectionPage: React.FC<SelectionPageProps> = ({ navigateToUrbanFarm, navigateToLandowner }) => {
+const SelectionPage: React.FC<SelectionPageProps> = ({ navigateToUrbanFarm, navigateToLandowner, goBack }) => {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center relative">
+      <button
+        onClick={goBack}
+        className="absolute top-4 left-4 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+      >
+        Go Back
+      </button>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 max-w-4xl w-full">
         <div className="bg-white rounded-lg shadow p-8 flex flex-col items-center justify-center text-center">
           <h2 className="text-2xl font-bold mb-4">For Urban Farmers</h2>

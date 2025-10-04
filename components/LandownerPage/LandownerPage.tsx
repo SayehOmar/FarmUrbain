@@ -2,7 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 
-const LandownerPage: React.FC = () => {
+interface LandownerPageProps {
+  goBack: () => void;
+}
+
+const LandownerPage: React.FC<LandownerPageProps> = ({ goBack }) => {
   const [map, setMap] = useState<any>(null);
   const [drawnItems, setDrawnItems] = useState<any>(null);
 
@@ -60,7 +64,13 @@ const LandownerPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 p-8 relative">
+      <button
+        onClick={goBack}
+        className="absolute top-4 left-4 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+      >
+        Go Back
+      </button>
       <h1 className="text-3xl font-bold text-center mb-8">Landowner - Define Your Land</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="bg-white rounded-lg shadow p-8">

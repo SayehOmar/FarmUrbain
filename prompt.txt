@@ -1,45 +1,41 @@
-# Task: Create new pages and components following the existing theme.
+# Task: Fix Leaflet runtime error in Next.js project
 
-## Directories
-- Create a new directory for each new component.
+## Context
+The project throws this error:
+TypeError: Cannot read properties of undefined (reading 'appendChild')
 
-## Page 1: Selection Page
-- Create a page with **two panels** (keep same layout theme as existing pages).
-- Each panel will feature placeholder information.
-- Add **two buttons** in the center or at the bottom:
-  - Button 1: “Urban-Farm Business”
-  - Button 2: “Landowner”
-- Both buttons should:
-  - Change color on hover.
-  - Have routing to their respective pages.
+It occurs because Leaflet is trying to access the DOM during server-side rendering (SSR) in Next.js.
 
-### Routing:
-- "Urban-Farm Business" → `/urban-farm`
-- "Landowner" → `/landowner`
+## Requirements
+1. Refactor the code so Leaflet is only initialized on the client side.
+2. Prevent SSR for the map component using `next/dynamic`.
+3. Move map initialization into a `useEffect` hook.
+4. Ensure the component is marked `"use client"`.
+5. Fix any custom icon or map element initialization that depends on `document` or `window`.
 
----
+## Implementation Steps
+- Create a new component `/app/components/MapView.tsx`
+- Inside it:
+  - Add `"use client"`
+  - Use `useEffect` to initialize the map
+  - Make sure the container has an `id="map"`
+  - Add a default OpenStreetMap tile layer
+  - Center map on coordinates `[36.8065, 10.1815]` with zoom `12`
+- In `/app/page.tsx` or `/app/urban-farm/page.tsx`:
+  - Import the component dynamically:
+    ```tsx
+    const MapView = dynamic(() => import("../components/MapView"), { ssr: false });
+    ```
+  - Render it inside a container:
+    ```tsx
+    <main className="flex min-h-screen items-center justify-center">
+      <div className="w-[90%] h-[80vh]">
+        <MapView />
+      </div>
+    </main>
+    ```
+- Make sure all Leaflet markers and icons are defined after the map is initialized.
 
-## Page 2: Landowner Page (Step 1)
-- Split the page into two sections:
-  - **Right side:** interactive map with geometry drawing tools.
-  - **Left side:** panel to confirm the drawn geometry **or** upload a shapefile (`.shp`) of the land.
-- Add buttons:
-  - “Confirm Drawing”
-  - “Submit Shapefile”
-
----
-
-## Page 3: Urban-Farm Business Page (Step 2)
-- Split the page into two sections:
-  - **Right side:** map showing **all available lands**.
-  - **Left side:** panel with:
-    - Search bar to filter lands.
-    - Dynamic metadata display when a land is selected.
-    - “Confirm Rental” button at the bottom.
-
----
-
-## Notes:
-- Maintain same design theme, typography, and color scheme.
-- Use consistent padding, rounded corners, and animations.
-- Keep components modular and reusable.
+## Output
+A working, client-side Leaflet map component in Next.js without SSR errors.
+The runtime TypeError should be completely resolved.
