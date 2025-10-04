@@ -29,7 +29,7 @@ const CandidatesPanel: React.FC<CandidatesPanelProps> = ({ candidates, onZoomTo,
       </ul>
 
       <hr className="my-4" />
-      <h4 className="font-medium">Simulation Controls</h4>
+      <h4 className="font-medium text-black">Simulation Controls</h4>
       <div className="text-sm text-gray-600 mt-2">
         <label className="block">Cooling Effect (°C): <input type="number" value={coolingEffect} onChange={e => setCoolingEffect(parseInt(e.target.value, 10))} min="0" max="10" className="w-20 ml-2 border rounded px-2 py-1" /></label>
         <button onClick={() => onSimulate(coolingEffect)} className="mt-3 px-3 py-2 bg-blue-600 text-white rounded">Simulate Impact</button>

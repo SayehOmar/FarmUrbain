@@ -3,9 +3,10 @@ import React from 'react';
 
 interface NavbarProps {
   onRefresh: () => void;
+  navigateToLanding: () => void;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ onRefresh }) => {
+const Navbar: React.FC<NavbarProps> = ({ onRefresh, navigateToLanding }) => {
   return (
     <nav className="bg-white shadow p-4 flex items-center justify-between">
       <div className="flex items-center space-x-4">
@@ -14,7 +15,7 @@ const Navbar: React.FC<NavbarProps> = ({ onRefresh }) => {
       </div>
       <div className="flex items-center space-x-3">
         <button onClick={onRefresh} className="px-3 py-2 bg-green-700 text-white rounded">Refresh Data</button>
-        <a href="/" className="text-sm text-gray-600 hover:text-gray-900">Back to Landing</a>
+        <button onClick={navigateToLanding} className="text-sm text-gray-600 hover:text-gray-900">Go Back</button>
       </div>
     </nav>
   );

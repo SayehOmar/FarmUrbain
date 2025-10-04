@@ -8,7 +8,7 @@ const Features: React.FC = () => {
         Key Features
       </h2>
       <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-        <div className="shadow-lg rounded-2xl p-6 text-center">
+        <div className="shadow-lg rounded-2xl p-6 text-center transition-transform duration-300 ease-in-out hover:-translate-y-2 hover:scale-105">
           <div className="w-12 h-12 bg-green-100 text-green-700 mx-auto mb-4 flex items-center justify-center rounded-full">🌡️</div>
           <h3 className="text-xl font-semibold mb-2">Heat Map Analytics</h3>
           <p className="text-gray-600">
@@ -16,7 +16,7 @@ const Features: React.FC = () => {
           </p>
         </div>
 
-        <div className="shadow-lg rounded-2xl p-6 text-center">
+        <div className="shadow-lg rounded-2xl p-6 text-center transition-transform duration-300 ease-in-out hover:-translate-y-2 hover:scale-105">
           <div className="w-12 h-12 bg-green-100 text-green-700 mx-auto mb-4 flex items-center justify-center rounded-full">🏙️</div>
           <h3 className="text-xl font-semibold mb-2">Smart Site Selection</h3>
           <p className="text-gray-600">
@@ -24,7 +24,7 @@ const Features: React.FC = () => {
           </p>
         </div>
 
-        <div className="shadow-lg rounded-2xl p-6 text-center">
+        <div className="shadow-lg rounded-2xl p-6 text-center transition-transform duration-300 ease-in-out hover:-translate-y-2 hover:scale-105">
           <div className="w-12 h-12 bg-green-100 text-green-700 mx-auto mb-4 flex items-center justify-center rounded-full">🌿</div>
           <h3 className="text-xl font-semibold mb-2">Farm Monitoring</h3>
           <p className="text-gray-600">

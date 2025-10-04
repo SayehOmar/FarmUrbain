@@ -1,7 +1,11 @@
 
 import React from 'react';
 
-const Hero: React.FC = () => {
+interface HeroProps {
+  navigateToFarmUrb: () => void;
+}
+
+const Hero: React.FC<HeroProps> = ({ navigateToFarmUrb }) => {
   return (
     <section className="flex flex-col items-center justify-center flex-1 text-center px-6 py-20">
       <h1 className="text-4xl md:text-6xl font-bold text-green-900">
@@ -12,12 +16,12 @@ const Hero: React.FC = () => {
         climate-controlled farms in cities.
       </p>
       <div className="mt-8 flex space-x-4">
-        <a
-          href="#app"
+        <button
+          onClick={navigateToFarmUrb}
           className="px-6 py-3 bg-green-700 text-white rounded-lg hover:bg-green-800"
         >
           Get Started
-        </a>
+        </button>
         <a
           href="#features"
           className="px-6 py-3 border border-green-700 text-green-700 rounded-lg hover:bg-green-50"

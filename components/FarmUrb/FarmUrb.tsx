@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
 import Navbar from './Navbar';
 import ControlPanel from './ControlPanel';
@@ -7,7 +5,11 @@ import Map from './Map';
 import CandidatesPanel from './CandidatesPanel';
 import IoTSnapshot from './IoTSnapshot';
 
-const FarmUrb: React.FC = () => {
+interface FarmUrbProps {
+  navigateToLanding: () => void;
+}
+
+const FarmUrb: React.FC<FarmUrbProps> = ({ navigateToLanding }) => {
   const [sensors, setSensors] = useState<any[]>([]);
   const [candidates, setCandidates] = useState<any[]>([]);
   const [selectedInfo, setSelectedInfo] = useState('Select a site to view details');
@@ -149,7 +151,7 @@ const FarmUrb: React.FC = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <Navbar onRefresh={handleRefresh} />
+      <Navbar onRefresh={handleRefresh} navigateToLanding={navigateToLanding} />
       <main className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="md:col-span-1 flex flex-col gap-6">
             <ControlPanel onRunAHP={handleRunAHP} onToggleHeatmap={handleToggleHeatmap} onShowCandidates={handleShowCandidates} />

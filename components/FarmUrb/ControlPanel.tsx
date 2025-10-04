@@ -34,7 +34,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onRunAHP, onToggleHeatmap, 
 
       <hr className="my-4" />
 
-      <h4 className="font-medium">Quick Actions</h4>
+      <h4 className="font-medium text-black">Quick Actions</h4>
       <ul className="text-sm text-gray-600 mt-2 space-y-2">
         <li><button onClick={onToggleHeatmap} className="text-left w-full px-2 py-2 rounded hover:bg-gray-100">Toggle Heatmap</button></li>
         <li><button onClick={onShowCandidates} className="text-left w-full px-2 py-2 rounded hover:bg-gray-100">Show Candidate Sites</button></li>
