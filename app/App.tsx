@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import LandingPage from "../components/LandingPage/LandingPage";
 import SelectionPage from "../components/SelectionPage/SelectionPage";
-import LandownerPage from "../components/LandownerPage/LandownerPage";
 import dynamic from "next/dynamic";
 
 const DynamicUrbanFarmBusinessPage = dynamic(
@@ -56,12 +55,7 @@ const App: React.FC = () => {
       {currentPage === "urban-farm" && (
         <DynamicUrbanFarmBusinessPage goBack={goBack} />
       )}
-      {currentPage === "farmurb" && (
-        <DynamicFarmUrb
-          navigateToLanding={() => navigateTo("landing")}
-          goBack={goBack}
-        />
-      )}
+      {currentPage === "farmurb" && <DynamicFarmUrb goBack={goBack} />}
     </div>
   );
 };
