@@ -51,7 +51,7 @@ const App: React.FC = () => {
           goBack={goBack}
         />
       )}
-      {currentPage === "landowner" && <DynamicLandownerPage />}
+      {currentPage === "landowner" && <DynamicLandownerPage goBack={goBack} />}
       {currentPage === "urban-farm" && (
         <DynamicUrbanFarmBusinessPage goBack={goBack} />
       )}

@@ -1,41 +1,638 @@
-# Task: Fix Leaflet runtime error in Next.js project
+'use client';
 
-## Context
-The project throws this error:
-TypeError: Cannot read properties of undefined (reading 'appendChild')
+import React, { useEffect, useState } from 'react';
 
-It occurs because Leaflet is trying to access the DOM during server-side rendering (SSR) in Next.js.
+interface LandownerPageProps {
+  goBack: () => void;
+}
 
-## Requirements
-1. Refactor the code so Leaflet is only initialized on the client side.
-2. Prevent SSR for the map component using `next/dynamic`.
-3. Move map initialization into a `useEffect` hook.
-4. Ensure the component is marked `"use client"`.
-5. Fix any custom icon or map element initialization that depends on `document` or `window`.
+interface DrawingMetadata {
+  id: string;
+  name: string;
+  size: string;
+  landType: string;
+  price: string;
+  description: string;
+  geojson: any;
+  layer?: any;
+}
 
-## Implementation Steps
-- Create a new component `/app/components/MapView.tsx`
-- Inside it:
-  - Add `"use client"`
-  - Use `useEffect` to initialize the map
-  - Make sure the container has an `id="map"`
-  - Add a default OpenStreetMap tile layer
-  - Center map on coordinates `[36.8065, 10.1815]` with zoom `12`
-- In `/app/page.tsx` or `/app/urban-farm/page.tsx`:
-  - Import the component dynamically:
-    ```tsx
-    const MapView = dynamic(() => import("../components/MapView"), { ssr: false });
-    ```
-  - Render it inside a container:
-    ```tsx
-    <main className="flex min-h-screen items-center justify-center">
-      <div className="w-[90%] h-[80vh]">
-        <MapView />
+interface PendingGeometry {
+  id: string;
+  layer: any;
+  geojson: any;
+}
+
+const LandownerPage: React.FC<LandownerPageProps> = ({ goBack }) => {
+  const [map, setMap] = useState<any>(null);
+  const [drawnItems, setDrawnItems] = useState<any>(null);
+  const [isClient, setIsClient] = useState(false);
+  const [showPanel, setShowPanel] = useState(false);
+  const [drawings, setDrawings] = useState<DrawingMetadata[]>([]);
+  const [pendingGeometries, setPendingGeometries] = useState<PendingGeometry[]>([]);
+  const [editingDrawing, setEditingDrawing] = useState<DrawingMetadata | null>(null);
+  const [expandedDrawing, setExpandedDrawing] = useState<string | null>(null);
+  const [currentMetadata, setCurrentMetadata] = useState({
+    name: '',
+    size: '',
+    landType: 'rooftop',
+    price: '',
+    description: ''
+  });
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isClient || map) return;
+
+    Promise.all([
+      import('leaflet'),
+      import('leaflet-draw')
+    ]).then(([L]) => {
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl:
+          "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+        shadowUrl:
+          "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+      });
+
+      const mapInstance = L.map('map-landowner').setView([36.8065, 10.1815], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mapInstance);
+      setMap(mapInstance);
+
+      const drawnItemsLayer = new L.FeatureGroup();
+      mapInstance.addLayer(drawnItemsLayer);
+      setDrawnItems(drawnItemsLayer);
+
+      const drawControl = new (L.Control as any).Draw({
+        edit: {
+          featureGroup: drawnItemsLayer,
+        },
+        draw: {
+          polygon: true,
+          polyline: false,
+          rectangle: true,
+          circle: false,
+          marker: false,
+          circlemarker: false,
+        },
+      });
+      mapInstance.addControl(drawControl);
+
+      mapInstance.on('draw:created', (event: any) => {
+        const layer = event.layer;
+        drawnItemsLayer.addLayer(layer);
+        
+        // Add to pending geometries
+        const newGeometry: PendingGeometry = {
+          id: `pending-${Date.now()}-${Math.random()}`,
+          layer: layer,
+          geojson: layer.toGeoJSON()
+        };
+        
+        setPendingGeometries(prev => [...prev, newGeometry]);
+        setShowPanel(true);
+      });
+    }).catch((error) => {
+      console.error('Error loading Leaflet or Leaflet Draw:', error);
+    });
+
+    return () => {
+      if (map) {
+        map.remove();
+      }
+    };
+  }, [isClient, map]);
+
+  const handleSaveGeometry = (geometryId: string) => {
+    if (!currentMetadata.name || !currentMetadata.size || !currentMetadata.price) {
+      alert('Please fill in all required fields (Name, Size, Price)');
+      return;
+    }
+
+    const geometry = pendingGeometries.find(g => g.id === geometryId);
+    if (!geometry) return;
+
+    const newDrawing: DrawingMetadata = {
+      id: `drawing-${Date.now()}-${Math.random()}`,
+      ...currentMetadata,
+      geojson: geometry.geojson,
+      layer: geometry.layer
+    };
+
+    setDrawings([...drawings, newDrawing]);
+    
+    // Remove from pending
+    setPendingGeometries(prev => prev.filter(g => g.id !== geometryId));
+    
+    // Reset form
+    setCurrentMetadata({
+      name: '',
+      size: '',
+      landType: 'rooftop',
+      price: '',
+      description: ''
+    });
+    
+    alert('Land parcel saved successfully!');
+  };
+
+  const handleEditDrawing = (drawing: DrawingMetadata) => {
+    setEditingDrawing(drawing);
+    setCurrentMetadata({
+      name: drawing.name,
+      size: drawing.size,
+      landType: drawing.landType,
+      price: drawing.price,
+      description: drawing.description
+    });
+    setExpandedDrawing(drawing.id);
+  };
+
+  const handleUpdateDrawing = () => {
+    if (!editingDrawing) return;
+    
+    if (!currentMetadata.name || !currentMetadata.size || !currentMetadata.price) {
+      alert('Please fill in all required fields (Name, Size, Price)');
+      return;
+    }
+
+    const updatedDrawings = drawings.map(d => 
+      d.id === editingDrawing.id 
+        ? { ...d, ...currentMetadata }
+        : d
+    );
+
+    setDrawings(updatedDrawings);
+    setEditingDrawing(null);
+    setCurrentMetadata({
+      name: '',
+      size: '',
+      landType: 'rooftop',
+      price: '',
+      description: ''
+    });
+    
+    alert('Land parcel updated successfully!');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingDrawing(null);
+    setCurrentMetadata({
+      name: '',
+      size: '',
+      landType: 'rooftop',
+      price: '',
+      description: ''
+    });
+  };
+
+  const handleDeletePendingGeometry = (geometryId: string) => {
+    const geometry = pendingGeometries.find(g => g.id === geometryId);
+    if (geometry && drawnItems) {
+      drawnItems.removeLayer(geometry.layer);
+    }
+    setPendingGeometries(prev => prev.filter(g => g.id !== geometryId));
+  };
+
+  const handleExportDrawing = (drawing: DrawingMetadata) => {
+    const exportData = {
+      type: 'Feature',
+      geometry: drawing.geojson.geometry,
+      properties: {
+        name: drawing.name,
+        size: drawing.size,
+        landType: drawing.landType,
+        price: drawing.price,
+        description: drawing.description
+      }
+    };
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${drawing.name.replace(/\s+/g, '_')}_land.geojson`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportAll = () => {
+    if (drawings.length === 0) {
+      alert('No drawings to export');
+      return;
+    }
+
+    const allData = {
+      type: 'FeatureCollection',
+      features: drawings.map(d => ({
+        type: 'Feature',
+        geometry: d.geojson.geometry,
+        properties: {
+          name: d.name,
+          size: d.size,
+          landType: d.landType,
+          price: d.price,
+          description: d.description
+        }
+      }))
+    };
+
+    const dataStr = JSON.stringify(allData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `all_land_parcels_${Date.now()}.geojson`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDeleteDrawing = (id: string) => {
+    if (confirm('Are you sure you want to delete this land parcel?')) {
+      const drawing = drawings.find(d => d.id === id);
+      if (drawing && drawing.layer && drawnItems) {
+        drawnItems.removeLayer(drawing.layer);
+      }
+      setDrawings(drawings.filter(d => d.id !== id));
+    }
+  };
+
+  const handleShapefileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      alert(`Shapefile "${file.name}" submitted.`);
+      // Here you would typically process the shapefile
+    }
+  };
+
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
+        <div className="text-xl">Loading map...</div>
       </div>
-    </main>
-    ```
-- Make sure all Leaflet markers and icons are defined after the map is initialized.
+    );
+  }
 
-## Output
-A working, client-side Leaflet map component in Next.js without SSR errors.
-The runtime TypeError should be completely resolved.
+  return (
+    <div className="relative w-full h-screen overflow-hidden">
+      {/* Full-screen Map */}
+      <div
+        id="map-landowner"
+        className="absolute inset-0 w-full h-full"
+      ></div>
+
+      {/* Go Back Button - Top Left */}
+      <button
+        onClick={goBack}
+        className="absolute top-4 left-4 z-[1000] px-4 py-2 bg-white text-gray-800 rounded-lg shadow-lg hover:bg-gray-100 transition-colors"
+      >
+        ← Go Back
+      </button>
+
+      {/* Toggle Panel Button - Right Side */}
+      <button
+        onClick={() => setShowPanel(!showPanel)}
+        className="absolute top-1/2 right-4 transform -translate-y-1/2 z-[1000] p-3 bg-green-700 text-white rounded-lg shadow-lg opacity-30 hover:opacity-100 transition-opacity duration-300"
+      >
+        {showPanel ? "→" : "←"}
+      </button>
+
+      {/* Sliding Right Panel */}
+      <div
+        className={`absolute top-0 right-0 h-full w-96 bg-white shadow-2xl z-[999] transform transition-transform duration-300 ease-in-out ${
+          showPanel ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="h-full overflow-y-auto p-6">
+          {/* Close Button Inside Panel */}
+          <button
+            onClick={() => setShowPanel(false)}
+            className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-2xl"
+          >
+            ✕
+          </button>
+
+          <h2 className="text-2xl font-bold mb-6 mt-8">Submit Your Land</h2>
+
+          {/* Pending Geometries - Need Metadata */}
+          {pendingGeometries.length > 0 && (
+            <div className="mb-6">
+              <h3 className="font-semibold text-lg mb-3 text-orange-700">
+                ⚠️ Pending Land Parcels ({pendingGeometries.length})
+              </h3>
+              <p className="text-sm text-gray-600 mb-3">
+                Please add metadata for each drawn geometry:
+              </p>
+              
+              <div className="space-y-4">
+                {pendingGeometries.map((geometry, index) => (
+                  <div key={geometry.id} className="bg-orange-50 border-2 border-orange-300 rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="font-semibold">Geometry #{index + 1}</h4>
+                      <button
+                        onClick={() => handleDeletePendingGeometry(geometry.id)}
+                        className="text-red-600 hover:text-red-800 text-sm"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Land Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={currentMetadata.name}
+                          onChange={(e) => setCurrentMetadata({ ...currentMetadata, name: e.target.value })}
+                          placeholder="e.g., City Center Rooftop"
+                          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Size <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={currentMetadata.size}
+                            onChange={(e) => setCurrentMetadata({ ...currentMetadata, size: e.target.value })}
+                            placeholder="200 sqm"
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Price <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={currentMetadata.price}
+                            onChange={(e) => setCurrentMetadata({ ...currentMetadata, price: e.target.value })}
+                            placeholder="$500/mo"
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Land Type
+                        </label>
+                        <select
+                          value={currentMetadata.landType}
+                          onChange={(e) => setCurrentMetadata({ ...currentMetadata, landType: e.target.value })}
+                          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+                        >
+                          <option value="rooftop">Rooftop</option>
+                          <option value="vacant">Vacant Lot</option>
+                          <option value="industrial">Industrial Plot</option>
+                          <option value="residential">Residential Yard</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Description
+                        </label>
+                        <textarea
+                          value={currentMetadata.description}
+                          onChange={(e) => setCurrentMetadata({ ...currentMetadata, description: e.target.value })}
+                          placeholder="Additional details..."
+                          rows={2}
+                          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none resize-none"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleSaveGeometry(geometry.id)}
+                      className="w-full mt-3 px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 transition-colors font-semibold"
+                    >
+                      💾 Save This Parcel
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Saved Drawings List */}
+          {drawings.length > 0 && (
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-semibold text-lg text-green-700">✓ Saved Land Parcels ({drawings.length})</h3>
+                <button
+                  onClick={handleExportAll}
+                  className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Export All
+                </button>
+              </div>
+              
+              <div className="space-y-2">
+                {drawings.map((drawing) => (
+                  <div key={drawing.id} className="border border-gray-300 rounded-lg overflow-hidden">
+                    {/* Collapse Header */}
+                    <button
+                      onClick={() => setExpandedDrawing(expandedDrawing === drawing.id ? null : drawing.id)}
+                      className="w-full p-3 bg-gray-50 hover:bg-gray-100 text-left flex justify-between items-center transition-colors"
+                    >
+                      <div>
+                        <p className="font-semibold">{drawing.name}</p>
+                        <p className="text-sm text-gray-600">{drawing.size} • {drawing.price}</p>
+                      </div>
+                      <span className="text-gray-500">
+                        {expandedDrawing === drawing.id ? '▼' : '▶'}
+                      </span>
+                    </button>
+
+                    {/* Collapse Content */}
+                    {expandedDrawing === drawing.id && (
+                      <div className="p-3 bg-white border-t">
+                        {editingDrawing?.id === drawing.id ? (
+                          // Edit Mode
+                          <div className="space-y-3 mb-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Land Name <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={currentMetadata.name}
+                                onChange={(e) => setCurrentMetadata({ ...currentMetadata, name: e.target.value })}
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Size</label>
+                                <input
+                                  type="text"
+                                  value={currentMetadata.size}
+                                  onChange={(e) => setCurrentMetadata({ ...currentMetadata, size: e.target.value })}
+                                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
+                                <input
+                                  type="text"
+                                  value={currentMetadata.price}
+                                  onChange={(e) => setCurrentMetadata({ ...currentMetadata, price: e.target.value })}
+                                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Land Type</label>
+                              <select
+                                value={currentMetadata.landType}
+                                onChange={(e) => setCurrentMetadata({ ...currentMetadata, landType: e.target.value })}
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+                              >
+                                <option value="rooftop">Rooftop</option>
+                                <option value="vacant">Vacant Lot</option>
+                                <option value="industrial">Industrial Plot</option>
+                                <option value="residential">Residential Yard</option>
+                                <option value="other">Other</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                              <textarea
+                                value={currentMetadata.description}
+                                onChange={(e) => setCurrentMetadata({ ...currentMetadata, description: e.target.value })}
+                                rows={2}
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none resize-none"
+                              />
+                            </div>
+
+                            <div className="flex gap-2">
+                              <button
+                                onClick={handleUpdateDrawing}
+                                className="flex-1 px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                              >
+                                Save Changes
+                              </button>
+                              <button
+                                onClick={handleCancelEdit}
+                                className="px-3 py-2 bg-gray-300 text-gray-800 text-sm rounded hover:bg-gray-400"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          // View Mode
+                          <>
+                            <div className="space-y-2 text-sm mb-3">
+                              <p><span className="font-semibold">Type:</span> {drawing.landType}</p>
+                              <p><span className="font-semibold">Description:</span> {drawing.description || 'N/A'}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEditDrawing(drawing)}
+                                className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                              >
+                                ✏️ Edit
+                              </button>
+                              <button
+                                onClick={() => handleExportDrawing(drawing)}
+                                className="flex-1 px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                              >
+                                Export
+                              </button>
+                              <button
+                                onClick={() => handleDeleteDrawing(drawing.id)}
+                                className="px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <div className="space-y-6">
+            {/* Drawing Instructions */}
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <h3 className="font-semibold text-blue-900 mb-2">📍 How to Mark Your Land</h3>
+              <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                <li>Use the drawing tools on the left side of the map</li>
+                <li>Draw a polygon or rectangle for each land parcel</li>
+                <li>Fill in the metadata form that appears</li>
+                <li>Save each parcel individually</li>
+              </ol>
+            </div>
+
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">OR</span>
+              </div>
+            </div>
+
+            {/* Shapefile Upload Section */}
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <h3 className="font-semibold text-gray-900 mb-3">📂 Upload Shapefile</h3>
+              <p className="text-sm text-gray-600 mb-3">
+                Already have your land boundaries in a shapefile? Upload it here.
+              </p>
+              
+              <label 
+                htmlFor="shapefile" 
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Select Shapefile (.shp, .shx, .dbf)
+              </label>
+              <input 
+                id="shapefile" 
+                type="file" 
+                onChange={handleShapefileUpload} 
+                accept=".shp,.shx,.dbf" 
+                multiple 
+                className="block w-full text-sm text-gray-500 
+                  file:mr-4 file:py-2 file:px-4 
+                  file:rounded-lg file:border-0 
+                  file:text-sm file:font-semibold 
+                  file:bg-green-700 file:text-white 
+                  hover:file:bg-green-800 
+                  file:cursor-pointer
+                  cursor-pointer"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                You can select multiple files (.shp, .shx, .dbf, .prj)
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default LandownerPage;
