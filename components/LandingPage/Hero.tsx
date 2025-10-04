@@ -2,10 +2,10 @@
 import React from 'react';
 
 interface HeroProps {
-  navigateToFarmUrb: () => void;
+  navigateToSelection: () => void;
 }
 
-const Hero: React.FC<HeroProps> = ({ navigateToFarmUrb }) => {
+const Hero: React.FC<HeroProps> = ({ navigateToSelection }) => {
   return (
     <section className="flex flex-col items-center justify-center flex-1 text-center px-6 py-20">
       <h1 className="text-4xl md:text-6xl font-bold text-green-900">
@@ -17,7 +17,7 @@ const Hero: React.FC<HeroProps> = ({ navigateToFarmUrb }) => {
       </p>
       <div className="mt-8 flex space-x-4">
         <button
-          onClick={navigateToFarmUrb}
+          onClick={navigateToSelection}
           className="px-6 py-3 bg-green-700 text-white rounded-lg hover:bg-green-800"
         >
           Get Started

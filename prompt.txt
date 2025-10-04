@@ -1,0 +1,45 @@
+# Task: Create new pages and components following the existing theme.
+
+## Directories
+- Create a new directory for each new component.
+
+## Page 1: Selection Page
+- Create a page with **two panels** (keep same layout theme as existing pages).
+- Each panel will feature placeholder information.
+- Add **two buttons** in the center or at the bottom:
+  - Button 1: “Urban-Farm Business”
+  - Button 2: “Landowner”
+- Both buttons should:
+  - Change color on hover.
+  - Have routing to their respective pages.
+
+### Routing:
+- "Urban-Farm Business" → `/urban-farm`
+- "Landowner" → `/landowner`
+
+---
+
+## Page 2: Landowner Page (Step 1)
+- Split the page into two sections:
+  - **Right side:** interactive map with geometry drawing tools.
+  - **Left side:** panel to confirm the drawn geometry **or** upload a shapefile (`.shp`) of the land.
+- Add buttons:
+  - “Confirm Drawing”
+  - “Submit Shapefile”
+
+---
+
+## Page 3: Urban-Farm Business Page (Step 2)
+- Split the page into two sections:
+  - **Right side:** map showing **all available lands**.
+  - **Left side:** panel with:
+    - Search bar to filter lands.
+    - Dynamic metadata display when a land is selected.
+    - “Confirm Rental” button at the bottom.
+
+---
+
+## Notes:
+- Maintain same design theme, typography, and color scheme.
+- Use consistent padding, rounded corners, and animations.
+- Keep components modular and reusable.

@@ -2,7 +2,9 @@
 
 import React, { useState } from "react";
 import LandingPage from '../components/LandingPage/LandingPage';
-import FarmUrb from '../components/FarmUrb/FarmUrb';
+import SelectionPage from '../components/SelectionPage/SelectionPage';
+import LandownerPage from '../components/LandownerPage/LandownerPage';
+import UrbanFarmBusinessPage from '../components/UrbanFarmBusinessPage/UrbanFarmBusinessPage';
 
 const App: React.FC = () => {
   const [page, setPage] = useState("landing");
@@ -13,8 +15,10 @@ const App: React.FC = () => {
 
   return (
     <div>
-      {page === "landing" && <LandingPage navigateToFarmUrb={() => navigateTo("farmurb")} />}
-      {page === "farmurb" && <FarmUrb navigateToLanding={() => navigateTo("landing")} />}
+      {page === "landing" && <LandingPage navigateToSelection={() => navigateTo("selection")} />}
+      {page === "selection" && <SelectionPage navigateToUrbanFarm={() => navigateTo("urban-farm")} navigateToLandowner={() => navigateTo("landowner")} />}
+      {page === "landowner" && <LandownerPage />}
+      {page === "urban-farm" && <UrbanFarmBusinessPage />}
     </div>
   );
 };
