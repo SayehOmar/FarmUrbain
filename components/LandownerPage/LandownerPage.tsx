@@ -6,11 +6,43 @@ interface LandownerPageProps {
   goBack: () => void;
 }
 
+interface DrawingMetadata {
+  id: string;
+  name: string;
+  size: string;
+  landType: string;
+  price: string;
+  description: string;
+  geojson: any;
+  layer?: any;
+}
+
+interface PendingGeometry {
+  id: string;
+  layer: any;
+  geojson: any;
+}
+
 const LandownerPage: React.FC<LandownerPageProps> = ({ goBack }) => {
   const [map, setMap] = useState<any>(null);
   const [drawnItems, setDrawnItems] = useState<any>(null);
   const [isClient, setIsClient] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
+  const [drawings, setDrawings] = useState<DrawingMetadata[]>([]);
+  const [pendingGeometries, setPendingGeometries] = useState<PendingGeometry[]>(
+    []
+  );
+  const [editingDrawing, setEditingDrawing] = useState<DrawingMetadata | null>(
+    null
+  );
+  const [expandedDrawing, setExpandedDrawing] = useState<string | null>(null);
+  const [currentMetadata, setCurrentMetadata] = useState({
+    name: "",
+    size: "",
+    landType: "rooftop",
+    price: "",
+    description: "",
+  });
 
   useEffect(() => {
     setIsClient(true);
@@ -59,10 +91,19 @@ const LandownerPage: React.FC<LandownerPageProps> = ({ goBack }) => {
         });
         mapInstance.addControl(drawControl);
 
-        // Use string event name instead of L.Draw.Event
         mapInstance.on("draw:created", (event: any) => {
           const layer = event.layer;
           drawnItemsLayer.addLayer(layer);
+
+          // Add to pending geometries
+          const newGeometry: PendingGeometry = {
+            id: `pending-${Date.now()}-${Math.random()}`,
+            layer: layer,
+            geojson: layer.toGeoJSON(),
+          };
+
+          setPendingGeometries((prev) => [...prev, newGeometry]);
+          setShowPanel(true);
         });
       })
       .catch((error) => {
@@ -76,10 +117,165 @@ const LandownerPage: React.FC<LandownerPageProps> = ({ goBack }) => {
     };
   }, [isClient, map]);
 
-  const handleConfirmDrawing = () => {
-    const geojson = drawnItems.toGeoJSON();
-    console.log(geojson);
-    alert("Drawing confirmed! Check the console for the GeoJSON data.");
+  const handleSaveGeometry = (geometryId: string) => {
+    if (
+      !currentMetadata.name ||
+      !currentMetadata.size ||
+      !currentMetadata.price
+    ) {
+      alert("Please fill in all required fields (Name, Size, Price)");
+      return;
+    }
+
+    const geometry = pendingGeometries.find((g) => g.id === geometryId);
+    if (!geometry) return;
+
+    const newDrawing: DrawingMetadata = {
+      id: `drawing-${Date.now()}-${Math.random()}`,
+      ...currentMetadata,
+      geojson: geometry.geojson,
+      layer: geometry.layer,
+    };
+
+    setDrawings([...drawings, newDrawing]);
+
+    // Remove from pending
+    setPendingGeometries((prev) => prev.filter((g) => g.id !== geometryId));
+
+    // Reset form
+    setCurrentMetadata({
+      name: "",
+      size: "",
+      landType: "rooftop",
+      price: "",
+      description: "",
+    });
+
+    alert("Land parcel saved successfully!");
+  };
+
+  const handleEditDrawing = (drawing: DrawingMetadata) => {
+    setEditingDrawing(drawing);
+    setCurrentMetadata({
+      name: drawing.name,
+      size: drawing.size,
+      landType: drawing.landType,
+      price: drawing.price,
+      description: drawing.description,
+    });
+    setExpandedDrawing(drawing.id);
+  };
+
+  const handleUpdateDrawing = () => {
+    if (!editingDrawing) return;
+
+    if (
+      !currentMetadata.name ||
+      !currentMetadata.size ||
+      !currentMetadata.price
+    ) {
+      alert("Please fill in all required fields (Name, Size, Price)");
+      return;
+    }
+
+    const updatedDrawings = drawings.map((d) =>
+      d.id === editingDrawing.id ? { ...d, ...currentMetadata } : d
+    );
+
+    setDrawings(updatedDrawings);
+    setEditingDrawing(null);
+    setCurrentMetadata({
+      name: "",
+      size: "",
+      landType: "rooftop",
+      price: "",
+      description: "",
+    });
+
+    alert("Land parcel updated successfully!");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingDrawing(null);
+    setCurrentMetadata({
+      name: "",
+      size: "",
+      landType: "rooftop",
+      price: "",
+      description: "",
+    });
+  };
+
+  const handleDeletePendingGeometry = (geometryId: string) => {
+    const geometry = pendingGeometries.find((g) => g.id === geometryId);
+    if (geometry && drawnItems) {
+      drawnItems.removeLayer(geometry.layer);
+    }
+    setPendingGeometries((prev) => prev.filter((g) => g.id !== geometryId));
+  };
+
+  const handleExportDrawing = (drawing: DrawingMetadata) => {
+    const exportData = {
+      type: "Feature",
+      geometry: drawing.geojson.geometry,
+      properties: {
+        name: drawing.name,
+        size: drawing.size,
+        landType: drawing.landType,
+        price: drawing.price,
+        description: drawing.description,
+      },
+    };
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${drawing.name.replace(/\s+/g, "_")}_land.geojson`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportAll = () => {
+    if (drawings.length === 0) {
+      alert("No drawings to export");
+      return;
+    }
+
+    const allData = {
+      type: "FeatureCollection",
+      features: drawings.map((d) => ({
+        type: "Feature",
+        geometry: d.geojson.geometry,
+        properties: {
+          name: d.name,
+          size: d.size,
+          landType: d.landType,
+          price: d.price,
+          description: d.description,
+        },
+      })),
+    };
+
+    const dataStr = JSON.stringify(allData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `all_land_parcels_${Date.now()}.geojson`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDeleteDrawing = (id: string) => {
+    if (confirm("Are you sure you want to delete this land parcel?")) {
+      const drawing = drawings.find((d) => d.id === id);
+      if (drawing && drawing.layer && drawnItems) {
+        drawnItems.removeLayer(drawing.layer);
+      }
+      setDrawings(drawings.filter((d) => d.id !== id));
+    }
   };
 
   const handleShapefileUpload = (
@@ -138,6 +334,345 @@ const LandownerPage: React.FC<LandownerPageProps> = ({ goBack }) => {
 
           <h2 className="text-2xl font-bold mb-6 mt-8">Submit Your Land</h2>
 
+          {/* Pending Geometries - Need Metadata */}
+          {pendingGeometries.length > 0 && (
+            <div className="mb-6">
+              <h3 className="font-semibold text-lg mb-3 text-orange-700">
+                ⚠️ Pending Land Parcels ({pendingGeometries.length})
+              </h3>
+              <p className="text-sm text-gray-600 mb-3">
+                Please add metadata for each drawn geometry:
+              </p>
+
+              <div className="space-y-4">
+                {pendingGeometries.map((geometry, index) => (
+                  <div
+                    key={geometry.id}
+                    className="bg-orange-50 border-2 border-orange-300 rounded-lg p-4"
+                  >
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="font-semibold">Geometry #{index + 1}</h4>
+                      <button
+                        onClick={() => handleDeletePendingGeometry(geometry.id)}
+                        className="text-red-600 hover:text-red-800 text-sm"
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Land Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={currentMetadata.name}
+                          onChange={(e) =>
+                            setCurrentMetadata({
+                              ...currentMetadata,
+                              name: e.target.value,
+                            })
+                          }
+                          placeholder="e.g., City Center Rooftop"
+                          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Size <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={currentMetadata.size}
+                            onChange={(e) =>
+                              setCurrentMetadata({
+                                ...currentMetadata,
+                                size: e.target.value,
+                              })
+                            }
+                            placeholder="200 sqm"
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Price <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={currentMetadata.price}
+                            onChange={(e) =>
+                              setCurrentMetadata({
+                                ...currentMetadata,
+                                price: e.target.value,
+                              })
+                            }
+                            placeholder="$500/mo"
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Land Type
+                        </label>
+                        <select
+                          value={currentMetadata.landType}
+                          onChange={(e) =>
+                            setCurrentMetadata({
+                              ...currentMetadata,
+                              landType: e.target.value,
+                            })
+                          }
+                          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+                        >
+                          <option value="rooftop">Rooftop</option>
+                          <option value="vacant">Vacant Lot</option>
+                          <option value="industrial">Industrial Plot</option>
+                          <option value="residential">Residential Yard</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Description
+                        </label>
+                        <textarea
+                          value={currentMetadata.description}
+                          onChange={(e) =>
+                            setCurrentMetadata({
+                              ...currentMetadata,
+                              description: e.target.value,
+                            })
+                          }
+                          placeholder="Additional details..."
+                          rows={2}
+                          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none resize-none"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleSaveGeometry(geometry.id)}
+                      className="w-full mt-3 px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 transition-colors font-semibold"
+                    >
+                      💾 Save This Parcel
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Saved Drawings List */}
+          {drawings.length > 0 && (
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-semibold text-lg text-green-700">
+                  ✓ Saved Land Parcels ({drawings.length})
+                </h3>
+                <button
+                  onClick={handleExportAll}
+                  className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Export All
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {drawings.map((drawing) => (
+                  <div
+                    key={drawing.id}
+                    className="border border-gray-300 rounded-lg overflow-hidden"
+                  >
+                    {/* Collapse Header */}
+                    <button
+                      onClick={() =>
+                        setExpandedDrawing(
+                          expandedDrawing === drawing.id ? null : drawing.id
+                        )
+                      }
+                      className="w-full p-3 bg-gray-50 hover:bg-gray-100 text-left flex justify-between items-center transition-colors"
+                    >
+                      <div>
+                        <p className="font-semibold">{drawing.name}</p>
+                        <p className="text-sm text-gray-600">
+                          {drawing.size} • {drawing.price}
+                        </p>
+                      </div>
+                      <span className="text-gray-500">
+                        {expandedDrawing === drawing.id ? "▼" : "▶"}
+                      </span>
+                    </button>
+
+                    {/* Collapse Content */}
+                    {expandedDrawing === drawing.id && (
+                      <div className="p-3 bg-white border-t">
+                        {editingDrawing?.id === drawing.id ? (
+                          // Edit Mode
+                          <div className="space-y-3 mb-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Land Name{" "}
+                                <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={currentMetadata.name}
+                                onChange={(e) =>
+                                  setCurrentMetadata({
+                                    ...currentMetadata,
+                                    name: e.target.value,
+                                  })
+                                }
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Size
+                                </label>
+                                <input
+                                  type="text"
+                                  value={currentMetadata.size}
+                                  onChange={(e) =>
+                                    setCurrentMetadata({
+                                      ...currentMetadata,
+                                      size: e.target.value,
+                                    })
+                                  }
+                                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Price
+                                </label>
+                                <input
+                                  type="text"
+                                  value={currentMetadata.price}
+                                  onChange={(e) =>
+                                    setCurrentMetadata({
+                                      ...currentMetadata,
+                                      price: e.target.value,
+                                    })
+                                  }
+                                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Land Type
+                              </label>
+                              <select
+                                value={currentMetadata.landType}
+                                onChange={(e) =>
+                                  setCurrentMetadata({
+                                    ...currentMetadata,
+                                    landType: e.target.value,
+                                  })
+                                }
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+                              >
+                                <option value="rooftop">Rooftop</option>
+                                <option value="vacant">Vacant Lot</option>
+                                <option value="industrial">
+                                  Industrial Plot
+                                </option>
+                                <option value="residential">
+                                  Residential Yard
+                                </option>
+                                <option value="other">Other</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Description
+                              </label>
+                              <textarea
+                                value={currentMetadata.description}
+                                onChange={(e) =>
+                                  setCurrentMetadata({
+                                    ...currentMetadata,
+                                    description: e.target.value,
+                                  })
+                                }
+                                rows={2}
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none resize-none"
+                              />
+                            </div>
+
+                            <div className="flex gap-2">
+                              <button
+                                onClick={handleUpdateDrawing}
+                                className="flex-1 px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                              >
+                                Save Changes
+                              </button>
+                              <button
+                                onClick={handleCancelEdit}
+                                className="px-3 py-2 bg-gray-300 text-gray-800 text-sm rounded hover:bg-gray-400"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          // View Mode
+                          <>
+                            <div className="space-y-2 text-sm mb-3">
+                              <p>
+                                <span className="font-semibold">Type:</span>{" "}
+                                {drawing.landType}
+                              </p>
+                              <p>
+                                <span className="font-semibold">
+                                  Description:
+                                </span>{" "}
+                                {drawing.description || "N/A"}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEditDrawing(drawing)}
+                                className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                              >
+                                ✏️ Edit
+                              </button>
+                              <button
+                                onClick={() => handleExportDrawing(drawing)}
+                                className="flex-1 px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                              >
+                                Export
+                              </button>
+                              <button
+                                onClick={() => handleDeleteDrawing(drawing.id)}
+                                className="px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-6">
             {/* Drawing Instructions */}
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
@@ -146,18 +681,11 @@ const LandownerPage: React.FC<LandownerPageProps> = ({ goBack }) => {
               </h3>
               <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
                 <li>Use the drawing tools on the left side of the map</li>
-                <li>Draw a polygon or rectangle around your property</li>
-                <li>Click "Confirm Drawing" when finished</li>
+                <li>Draw a polygon or rectangle for each land parcel</li>
+                <li>Fill in the metadata form that appears</li>
+                <li>Save each parcel individually</li>
               </ol>
             </div>
-
-            {/* Confirm Drawing Button */}
-            <button
-              onClick={handleConfirmDrawing}
-              className="w-full px-6 py-3 bg-green-700 text-white rounded-lg hover:bg-green-800 transition-colors font-semibold shadow-md"
-            >
-              ✓ Confirm Drawing
-            </button>
 
             {/* Divider */}
             <div className="relative">
@@ -203,20 +731,6 @@ const LandownerPage: React.FC<LandownerPageProps> = ({ goBack }) => {
               <p className="text-xs text-gray-500 mt-2">
                 You can select multiple files (.shp, .shx, .dbf, .prj)
               </p>
-            </div>
-
-            {/* Additional Information */}
-            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-              <h3 className="font-semibold text-green-900 mb-2">
-                💡 What Happens Next?
-              </h3>
-              <ul className="text-sm text-green-800 space-y-1">
-                <li>• Your land will be reviewed by our team</li>
-                <li>• You'll receive a confirmation within 24-48 hours</li>
-                <li>
-                  • Once approved, your land will be listed for urban farmers
-                </li>
-              </ul>
             </div>
           </div>
         </div>
