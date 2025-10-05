@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import L from 'leaflet';
+
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 
@@ -27,10 +27,9 @@ const LandownerMap: React.FC<LandownerMapProps> = ({
   useEffect(() => {
     if (!isClient || map) return;
 
-    Promise.all([
-      import('leaflet'),
-      import('leaflet-draw')
-    ]).then(([L]) => {
+    import('leaflet').then((LModule) => {
+      const L = LModule.default || LModule; // Handle different import styles
+
       delete (L.Icon.Default.prototype as any)._getIconUrl;
       L.Icon.Default.mergeOptions({
         iconRetinaUrl:
@@ -44,40 +43,44 @@ const LandownerMap: React.FC<LandownerMapProps> = ({
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mapInstance);
       setMap(mapInstance);
 
-      const drawnItemsLayer = new L.FeatureGroup();
-      mapInstance.addLayer(drawnItemsLayer);
-      setDrawnItems(drawnItemsLayer);
+      import('leaflet-draw').then(() => {
+        const drawnItemsLayer = new L.FeatureGroup();
+        mapInstance.addLayer(drawnItemsLayer);
+        setDrawnItems(drawnItemsLayer);
 
-      const drawControl = new (L.Control as any).Draw({
-        edit: {
-          featureGroup: drawnItemsLayer,
-        },
-        draw: {
-          polygon: true,
-          polyline: false,
-          rectangle: true,
-          circle: false,
-          marker: false,
-          circlemarker: false,
-        },
-      });
-      mapInstance.addControl(drawControl);
+        const drawControl = new (L.Control as any).Draw({
+          edit: {
+            featureGroup: drawnItemsLayer,
+          },
+          draw: {
+            polygon: true,
+            polyline: false,
+            rectangle: true,
+            circle: false,
+            marker: false,
+            circlemarker: false,
+          },
+        });
+        mapInstance.addControl(drawControl);
 
-      mapInstance.on('draw:created', (event: any) => {
-        const layer = event.layer;
-        drawnItemsLayer.addLayer(layer);
-        
-        const newGeometry = {
-          id: `pending-${Date.now()}-${Math.random()}`,
-          layer: layer,
-          geojson: layer.toGeoJSON()
-        };
-        
-        setPendingGeometries(prev => [...prev, newGeometry]);
-        setShowPanel(true);
+        mapInstance.on('draw:created', (event: any) => {
+          const layer = event.layer;
+          drawnItemsLayer.addLayer(layer);
+          
+          const newGeometry = {
+            id: `pending-${Date.now()}-${Math.random()}`,
+            layer: layer,
+            geojson: layer.toGeoJSON()
+          };
+          
+          setPendingGeometries(prev => [...prev, newGeometry]);
+          setShowPanel(true);
+        });
+      }).catch((error) => {
+        console.error('Error loading Leaflet Draw:', error);
       });
     }).catch((error) => {
-      console.error('Error loading Leaflet or Leaflet Draw:', error);
+      console.error('Error loading Leaflet:', error);
     });
 
     return () => {

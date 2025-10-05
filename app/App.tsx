@@ -9,9 +9,7 @@ const DynamicUrbanFarmBusinessPage = dynamic(
   () => import("../components/UrbanFarmBusinessPage/UrbanFarmBusinessPage"),
   { ssr: false }
 );
-const DynamicFarmUrb = dynamic(() => import("../components/FarmUrb/FarmUrb"), {
-  ssr: false,
-});
+
 const DynamicLandownerPage = dynamic(
   () => import("../components/LandownerPage/LandownerPage"),
   { ssr: false }
@@ -55,7 +53,6 @@ const App: React.FC = () => {
       {currentPage === "urban-farm" && (
         <DynamicUrbanFarmBusinessPage goBack={goBack} />
       )}
-      {currentPage === "farmurb" && <DynamicFarmUrb goBack={goBack} />}
     </div>
   );
 };
