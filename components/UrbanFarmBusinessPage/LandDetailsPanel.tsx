@@ -17,8 +17,10 @@ interface GeometryData {
   coordinates: PolygonCoordinates | MultiPolygonCoordinates;
   properties: {
     name: string;
-    size: string;
+    surface: number; // Changed from size to surface
     price: string;
+    landType: string;
+    description: string;
     [key: string]: any;
   };
 }

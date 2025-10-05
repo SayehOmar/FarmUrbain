@@ -14,8 +14,10 @@ interface GeometryData {
   coordinates: PolygonCoordinates | MultiPolygonCoordinates;
   properties: {
     name: string;
-    size: string;
+    surface: number; // Changed from size to surface
     price: string;
+    landType: string;
+    description: string;
     [key: string]: any;
   };
 }
@@ -37,15 +39,23 @@ const SelectedLandDisplay: React.FC<SelectedLandDisplayProps> = ({
 
   return (
     <div className="bg-gray-50 p-4 rounded-lg">
-      <h3 className="text-xl font-bold mb-3">{selectedLand.name}</h3>
+      <h3 className="text-xl font-bold mb-3">{selectedLand.properties.name}</h3>
       <div className="space-y-2 mb-4">
         <p className="text-gray-700">
-          <span className="font-semibold">Size:</span>{" "}
-          {selectedLand.size}
+          <span className="font-semibold">Surface:</span>{" "}
+          {selectedLand.properties.surface ? `${selectedLand.properties.surface.toFixed(2)} sqm` : 'N/A'}
         </p>
         <p className="text-gray-700">
           <span className="font-semibold">Price:</span>{" "}
-          {selectedLand.price}
+          {selectedLand.properties.price}
+        </p>
+        <p className="text-gray-700">
+          <span className="font-semibold">Land Type:</span>{" "}
+          {selectedLand.properties.landType}
+        </p>
+        <p className="text-gray-700">
+          <span className="font-semibold">Description:</span>{" "}
+          {selectedLand.properties.description}
         </p>
       </div>
       <button className="w-full px-6 py-3 bg-green-700 text-white rounded-lg hover:bg-green-800 transition-colors font-semibold">

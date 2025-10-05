@@ -14,8 +14,10 @@ interface GeometryData {
   coordinates: PolygonCoordinates | MultiPolygonCoordinates;
   properties: {
     name: string;
-    size: string;
+    surface: number; // Changed from size to surface
     price: string;
+    landType: string;
+    description: string;
     [key: string]: any;
   };
 }
@@ -57,8 +59,11 @@ const AvailableLandsList: React.FC<AvailableLandsListProps> = ({
           >
             <p className="font-semibold">{land.properties.name}</p>
             <p className="text-sm text-gray-600">
-              {land.properties.size} • {land.properties.price}
+              {land.properties.surface ? `${land.properties.surface.toFixed(2)} sqm` : 'N/A'} • {land.properties.price} • {land.properties.landType}
             </p>
+            {land.properties.description && (
+              <p className="text-xs text-gray-500">{land.properties.description}</p>
+            )}
           </div>
         ))}
       </div>
