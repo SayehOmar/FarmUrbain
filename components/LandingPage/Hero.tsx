@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React from "react";
 
 interface HeroProps {
   navigateToSelection: () => void;
@@ -8,7 +7,12 @@ interface HeroProps {
   showBackButton: boolean;
 }
 
-const Hero: React.FC<HeroProps> = ({ navigateToSelection, navigateToFarmUrb, goBack, showBackButton }) => {
+const Hero: React.FC<HeroProps> = ({
+  navigateToSelection,
+  navigateToFarmUrb,
+  goBack,
+  showBackButton,
+}) => {
   return (
     <section className="flex flex-col items-center justify-center flex-1 text-center px-6 py-20">
       {showBackButton && (
@@ -23,8 +27,8 @@ const Hero: React.FC<HeroProps> = ({ navigateToSelection, navigateToFarmUrb, goB
         Climate-Smart Urban Farming Platform
       </h1>
       <p className="mt-6 text-lg md:text-xl text-gray-600 max-w-2xl">
-        Harness AI, GIS, and IoT to combat Urban Heat Islands and build sustainable,
-        climate-controlled farms in cities.
+        Harness AI, GIS, and IoT to combat Urban Heat Islands and build
+        sustainable, climate-controlled farms in cities.
       </p>
       <div className="mt-8 flex space-x-4">
         <button
@@ -33,12 +37,7 @@ const Hero: React.FC<HeroProps> = ({ navigateToSelection, navigateToFarmUrb, goB
         >
           Get Started
         </button>
-        <button
-          onClick={navigateToFarmUrb}
-          className="px-6 py-3 border border-green-700 text-green-700 rounded-lg hover:bg-green-50"
-        >
-          Go to FarmUrb
-        </button>
+
         <a
           href="#features"
           className="px-6 py-3 border border-green-700 text-green-700 rounded-lg hover:bg-green-50"
