@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import UrbanFarmBusinessHeader from "./UrbanFarmBusinessHeader";
 import MapContainer from "./MapContainer";
 import LandDetailsPanel from "./LandDetailsPanel";
@@ -7,50 +7,65 @@ interface UrbanFarmBusinessPageProps {
   goBack: () => void;
 }
 
+interface PolygonCoordinates extends Array<[number, number]> {
+  0: [number, number][]; // first ring
+}
+
+interface MultiPolygonCoordinates extends Array<PolygonCoordinates> {
+  0: PolygonCoordinates; // first polygon
+}
+
+interface GeometryData {
+  _id: string;
+  type: "Polygon" | "MultiPolygon";
+  coordinates: PolygonCoordinates | MultiPolygonCoordinates;
+  properties: {
+    name: string;
+    size: string;
+    price: string;
+    [key: string]: any;
+  };
+}
+
 const UrbanFarmBusinessPage: React.FC<UrbanFarmBusinessPageProps> = ({
   goBack,
 }) => {
-  const availableLands = [
-    {
-      id: 1,
-      name: "City Center Rooftop",
-      coords: [36.8065, 10.1815],
-      size: "200 sqm",
-      price: "$500/month",
-    },
-    {
-      id: 2,
-      name: "Suburb Lot",
-      coords: [36.8625, 10.1956],
-      size: "500 sqm",
-      price: "$800/month",
-    },
-    {
-      id: 3,
-      name: "Industrial Park Plot",
-      coords: [36.7721, 10.151],
-      size: "1000 sqm",
-      price: "$1200/month",
-    },
-  ];
-
   const [map, setMap] = useState<any>(null);
-  const [filteredLands, setFilteredLands] = useState(availableLands);
-  const [selectedLand, setSelectedLand] = useState<any>(null);
+  const [geometries, setGeometries] = useState<GeometryData[]>([]);
+  const [filteredGeometries, setFilteredGeometries] = useState<GeometryData[]>([]);
+  const [selectedLand, setSelectedLand] = useState<GeometryData | null>(null);
   const [showPanel, setShowPanel] = useState(false);
+
+  useEffect(() => {
+    const fetchGeometries = async () => {
+      try {
+        const response = await fetch("/api/geometries");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data: GeometryData[] = await response.json();
+        setGeometries(data);
+        setFilteredGeometries(data); // Initialize filtered geometries with all geometries
+      } catch (error) {
+        console.error("Error fetching geometries:", error);
+      }
+    };
+
+    fetchGeometries();
+  }, []);
 
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
     const searchTerm = event.target.value.toLowerCase();
-    const filtered = availableLands.filter((land) =>
-      land.name.toLowerCase().includes(searchTerm)
+    const filtered = geometries.filter((geometry) =>
+      geometry.properties.name.toLowerCase().includes(searchTerm)
     );
-    setFilteredLands(filtered);
+    setFilteredGeometries(filtered);
   };
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
       <MapContainer
-        filteredLands={filteredLands}
+        geometries={filteredGeometries}
         setSelectedLand={setSelectedLand}
         setShowPanel={setShowPanel}
         setMap={setMap}
@@ -72,7 +87,7 @@ const UrbanFarmBusinessPage: React.FC<UrbanFarmBusinessPageProps> = ({
         setShowPanel={setShowPanel}
         selectedLand={selectedLand}
         setSelectedLand={setSelectedLand}
-        filteredLands={filteredLands}
+        filteredLands={filteredGeometries} // Pass filteredGeometries here
         handleSearch={handleSearch}
         map={map}
       />

@@ -1,17 +1,37 @@
-import React, { useEffect, useState } from 'react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import React, { useEffect, useState } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+interface PolygonCoordinates extends Array<[number, number]> {
+  0: [number, number][]; // first ring
+}
+
+interface MultiPolygonCoordinates extends Array<PolygonCoordinates> {
+  0: PolygonCoordinates; // first polygon
+}
+
+interface GeometryData {
+  _id: string;
+  type: "Polygon" | "MultiPolygon";
+  coordinates: PolygonCoordinates | MultiPolygonCoordinates;
+  properties: {
+    name: string;
+    size: string;
+    price: string;
+    [key: string]: any;
+  };
+}
 
 interface MapContainerProps {
-  filteredLands: any[];
-  setSelectedLand: (land: any) => void;
+  geometries: GeometryData[];
+  setSelectedLand: (land: GeometryData | null) => void;
   setShowPanel: (show: boolean) => void;
   setMap: (map: any) => void;
   map: any;
 }
 
 const MapContainer: React.FC<MapContainerProps> = ({
-  filteredLands,
+  geometries,
   setSelectedLand,
   setShowPanel,
   setMap,
@@ -61,22 +81,58 @@ const MapContainer: React.FC<MapContainerProps> = ({
     if (!map || !isClient) return;
 
     import("leaflet").then((L) => {
-      const markers: any[] = [];
-
-      filteredLands.forEach((land) => {
-        const marker = L.marker(land.coords as [number, number]).addTo(map);
-        marker.on("click", () => {
-          setSelectedLand(land);
-          setShowPanel(true);
-        });
-        markers.push(marker);
+      // Clear existing layers before adding new ones
+      map.eachLayer((layer: any) => {
+        if (layer instanceof L.Polygon) {
+          map.removeLayer(layer);
+        }
       });
 
-      return () => {
-        markers.forEach((marker) => marker.remove());
-      };
+      geometries.forEach((geometry) => {
+        if (!geometry.coordinates || geometry.coordinates.length === 0) {
+          console.warn(
+            "Geometry has no coordinates, skipping layer:",
+            geometry
+          );
+          return;
+        }
+
+        let layer;
+        switch (geometry.type) {
+          case "Polygon":
+            const polygonCoords = geometry.coordinates as PolygonCoordinates;
+            const latLngsPolygon = polygonCoords[0].map((coord) => [
+              coord[1],
+              coord[0],
+            ]);
+            layer = L.polygon(latLngsPolygon);
+            break;
+          case "MultiPolygon":
+            const multiPolygonCoords =
+              geometry.coordinates as MultiPolygonCoordinates;
+            const latLngsMultiPolygon = multiPolygonCoords.map((polygon) =>
+              polygon[0].map((coord) => [coord[1], coord[0]])
+            );
+            layer = L.polygon(latLngsMultiPolygon);
+            break;
+          default:
+            console.warn(
+              "Unsupported geometry type, skipping layer:",
+              geometry.type
+            );
+            return;
+        }
+
+        if (layer) {
+          layer.addTo(map);
+          layer.on("click", () => {
+            setSelectedLand(geometry);
+            setShowPanel(true);
+          });
+        }
+      });
     });
-  }, [map, filteredLands, isClient, setSelectedLand, setShowPanel]);
+  }, [map, geometries, isClient, setSelectedLand, setShowPanel]);
 
   if (!isClient) {
     return (
@@ -86,7 +142,9 @@ const MapContainer: React.FC<MapContainerProps> = ({
     );
   }
 
-  return <div id="map-urban-farm" className="absolute inset-0 w-full h-full"></div>;
+  return (
+    <div id="map-urban-farm" className="absolute inset-0 w-full h-full"></div>
+  );
 };
 
 export default MapContainer;

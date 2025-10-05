@@ -3,12 +3,32 @@ import LandSearchInput from './LandSearchInput';
 import SelectedLandDisplay from './SelectedLandDisplay';
 import AvailableLandsList from './AvailableLandsList';
 
+interface PolygonCoordinates extends Array<[number, number]> {
+  0: [number, number][]; // first ring
+}
+
+interface MultiPolygonCoordinates extends Array<PolygonCoordinates> {
+  0: PolygonCoordinates; // first polygon
+}
+
+interface GeometryData {
+  _id: string;
+  type: "Polygon" | "MultiPolygon";
+  coordinates: PolygonCoordinates | MultiPolygonCoordinates;
+  properties: {
+    name: string;
+    size: string;
+    price: string;
+    [key: string]: any;
+  };
+}
+
 interface LandDetailsPanelProps {
   showPanel: boolean;
   setShowPanel: (show: boolean) => void;
-  selectedLand: any;
-  setSelectedLand: (land: any) => void;
-  filteredLands: any[];
+  selectedLand: GeometryData | null;
+  setSelectedLand: (land: GeometryData | null) => void;
+  filteredLands: GeometryData[];
   handleSearch: (event: React.ChangeEvent<HTMLInputElement>) => void;
   map: any;
 }

@@ -2,6 +2,17 @@ import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import Geometry from '@/lib/models/Geometry';
 
+export async function GET() {
+  try {
+    await connectDB();
+    const geometries = await Geometry.find({});
+    return NextResponse.json(geometries, { status: 200 });
+  } catch (error) {
+    console.error('Error fetching geometries:', error);
+    return NextResponse.json({ message: 'Error fetching geometries', error: (error as Error).message }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     await connectDB();
