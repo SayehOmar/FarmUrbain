@@ -24,8 +24,12 @@ const Hero: React.FC<HeroProps> = ({
         </button>
       )}
       <h1 className="text-4xl md:text-6xl font-bold text-green-900">
-        Climate-Smart Urban Farming Platform
+        Grow it UP
       </h1>
+      <br />
+      <h2 className="text-2xl md:text-2xl font-bold text-green-900">
+        a Climate-Smart Urban Farming Platform
+      </h2>
       <p className="mt-6 text-lg md:text-xl text-gray-600 max-w-2xl">
         Harness AI, GIS, and IoT to combat Urban Heat Islands and build
         sustainable, climate-controlled farms in cities.
